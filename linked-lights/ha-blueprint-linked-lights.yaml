@@ -2,9 +2,9 @@ blueprint:
   name: Linked Lights
   description: >-
 
-    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fjnrcorp%2Fha-blueprints%2Fmain%2Flinked-lights%2Fha-blueprint-linked-lights.yaml)
+    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbearkiter-alt%2Fha-blueprints%2Fmain%2Flinked-lights%2Fha-blueprint-linked-lights.yaml)
 
-    **Linked Lights v1.0**
+    **Linked Lights v1.1 (2026 schema-fix fork)**
 
     This blueprint allows you to easily create/maintain an automation that links the state of multiple light entities:
       - turn ANY linked light ON, it will turn ON ALL linked lights.
@@ -14,131 +14,165 @@ blueprint:
 
     **NOTE**: You can select any light entity with an ON/OFF state (bulbs, lights, etc.), lights with brightness or color temperature attributes.
 
-    My main use-case was for multiple light switches in the house controlling the same light.
+    This is a fork of [jnrcorp/ha-blueprints](https://github.com/jnrcorp/ha-blueprints) — all credit to jnrcorp,
+    who in turn ported it from https://github.com/alexdelprete/ha-blueprints.
 
     **CHANGELOG:**
+      - 1.1: (2026-06-11) — 2026 schema-fix fork by bearkiter-alt
+        - Home Assistant 2026.x compatibility: `light.turn_on` no longer accepts the deprecated mireds `color_temp` parameter — sync `color_temp_kelvin` instead (trigger + service call).
+        - Skip brightness / colour-temp sync when the triggering light reports none (previously raised "expected int for dictionary value @ data['brightness']").
+        - Only send colour temperature to linked lights that actually support it, so brightness-only lights no longer error.
       - 1.0: (2025-05-10)
         - First official release - ported from https://github.com/alexdelprete/ha-blueprints
 
-    **Source:**
-    [![jnrcorp - ha-blueprints](https://img.shields.io/static/v1?label=jnrcorp&message=ha-blueprints&color=blue&logo=github)](https://github.com/jnrcorp/ha-blueprints/blob/main/linked-lights/ha-blueprint-linked-lights.yaml "Go to GitHub repo") [![stars - ha-blueprints](https://img.shields.io/github/stars/jnrcorp/ha-blueprints?style=social)](https://github.com/jnrcorp/ha-blueprints) [![forks - ha-blueprints](https://img.shields.io/github/forks/jnrcorp/ha-blueprints?style=social)](https://github.com/jnrcorp/ha-blueprints)
+    **Source:** [![bearkiter-alt - ha-blueprints](https://img.shields.io/static/v1?label=bearkiter-alt&message=ha-blueprints&color=blue&logo=github)](https://github.com/bearkiter-alt/ha-blueprints/blob/main/linked-lights/ha-blueprint-linked-lights.yaml "Go to GitHub repo") — forked from [jnrcorp/ha-blueprints](https://github.com/jnrcorp/ha-blueprints)
 
-    **Support:**
-    [![HA Community - Topic](https://img.shields.io/static/v1?label=HA+Community&message=Topic&color=2ea44f&logo=home-assistant)](https://community.home-assistant.io/t/linked-lights-keep-lights-in-sync/887934?u=jnrcorp)
-
+    **Support for the original:** [![HA Community - Topic](https://img.shields.io/static/v1?label=HA+Community&message=Topic&color=2ea44f&logo=home-assistant)](https://community.home-assistant.io/t/linked-lights-keep-lights-in-sync/887934?u=jnrcorp)
   domain: automation
   input:
     linked_light:
       name: Linked Lights
-      description: Lights whose state and attributes will be linked (if any of them transitions to ON state, all will be ON. Same for the OFF, BRIGHTNESS, COLOR_TEMP, and SPEED states).
+      description: Lights whose state and attributes will be linked (if any of them
+        transitions to ON state, all will be ON. Same for the OFF, BRIGHTNESS, COLOR_TEMP,
+        and SPEED states).
       selector:
         entity:
           filter:
-            domain: light
+          - domain:
+            - light
           multiple: true
+          reorder: false
     delay_miliseconds:
       name: Delay
       description: How long to delay changes to linked lights
       selector:
         number:
-          min: 0
-          max: 1000
+          min: 0.0
+          max: 1000.0
           unit_of_measurement: miliseconds
           mode: box
+          step: 1.0
       default: 200
-
+  source_url: https://raw.githubusercontent.com/bearkiter-alt/ha-blueprints/main/linked-lights/ha-blueprint-linked-lights.yaml
 mode: single
 max_exceeded: silent
-
 variables:
   linked_lights: !input linked_light
-
 trigger:
-  - platform: state
-    id: turn_on
-    entity_id: !input linked_light
-    from: "off"
-    to: "on"
-  - platform: state
-    id: turn_off
-    entity_id: !input linked_light
-    from: "on"
-    to: "off"
-  - platform: state
-    id: set_speed
-    entity_id: !input linked_light
-    attribute: percentage
-  - platform: state
-    id: set_brightness
-    entity_id: !input linked_light
-    attribute: brightness
-  - platform: state
-    id: set_color_temp
-    entity_id: !input linked_light
-    attribute: color_temp
-
+- platform: state
+  id: turn_on
+  entity_id: !input linked_light
+  from: 'off'
+  to: 'on'
+- platform: state
+  id: turn_off
+  entity_id: !input linked_light
+  from: 'on'
+  to: 'off'
+- platform: state
+  id: set_speed
+  entity_id: !input linked_light
+  attribute: percentage
+- platform: state
+  id: set_brightness
+  entity_id: !input linked_light
+  attribute: brightness
+- platform: state
+  id: set_color_temp
+  entity_id: !input linked_light
+  attribute: color_temp_kelvin
 condition:
-  - condition: template
-    value_template: "{{ trigger.to_state.context.id != this.context.id }}"
-
+- condition: template
+  value_template: '{{ trigger.to_state.context.id != this.context.id }}'
 action:
-  - choose:
-      - conditions:
-          - condition: trigger
-            id: turn_on
-        sequence:
-          - variables:
-              set_light_brightness: "{{ trigger.to_state.attributes.brightness }}"
-              set_light_color_temp: "{{ trigger.to_state.attributes.color_temp }}"
-          - service: light.turn_on
-            data:
-              entity_id: "{{linked_lights | reject('eq', trigger.entity_id) | list }}"
-              brightness: "{{ set_light_brightness }}"
-              color_temp: "{{ set_light_color_temp }}"
-          - delay:
-              milliseconds: !input delay_miliseconds
-      - conditions:
-          - condition: trigger
-            id: turn_off
-        sequence:
-          - service: "light.turn_off"
-            data:
-              entity_id: "{{linked_lights | reject('eq', trigger.entity_id) | list }}"
-          - delay:
-              milliseconds: !input delay_miliseconds
-      - conditions:
-          - condition: trigger
-            id: set_speed
-        sequence:
-          - variables:
-              set_fan_speed: "{{ trigger.to_state.attributes.percentage }}"
-          - service: fan.set_percentage
-            data:
-              entity_id: "{{linked_lights | reject('eq', trigger.entity_id) | list }}"
-              percentage: "{{ set_fan_speed }}"
-          - delay:
-              milliseconds: !input delay_miliseconds
-      - conditions:
-          - condition: trigger
-            id: set_brightness
-        sequence:
-          - variables:
-              set_light_brightness: "{{ trigger.to_state.attributes.brightness }}"
-          - service: light.turn_on
-            data:
-              entity_id: "{{linked_lights | reject('eq', trigger.entity_id) | list }}"
-              brightness: "{{ set_light_brightness }}"
-          - delay:
-              milliseconds: !input delay_miliseconds
-      - conditions:
-          - condition: trigger
-            id: set_color_temp
-        sequence:
-          - variables:
-              set_light_color_temp: "{{ trigger.to_state.attributes.color_temp }}"
-          - service: light.turn_on
-            data:
-              entity_id: "{{linked_lights | reject('eq', trigger.entity_id) | list }}"
-              color_temp: "{{ set_light_color_temp }}"
-          - delay:
-              milliseconds: !input delay_miliseconds
+- variables:
+    other_lights: '{{ linked_lights | reject(''eq'', trigger.entity_id) | list }}'
+    ct_capable_lights: >-
+      {% set ns = namespace(l=[]) %}
+      {% for e in other_lights %}
+        {% if 'color_temp' in (state_attr(e, 'supported_color_modes') or []) %}
+          {% set ns.l = ns.l + [e] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.l }}
+- choose:
+  - conditions:
+    - condition: trigger
+      id: turn_on
+    sequence:
+    - variables:
+        set_light_brightness: '{{ trigger.to_state.attributes.brightness }}'
+        set_light_color_temp_kelvin: '{{ trigger.to_state.attributes.color_temp_kelvin }}'
+    - if:
+      - condition: template
+        value_template: '{{ set_light_brightness is not none }}'
+      then:
+      - service: light.turn_on
+        data:
+          entity_id: '{{ other_lights }}'
+          brightness: '{{ set_light_brightness | int }}'
+      else:
+      - service: light.turn_on
+        data:
+          entity_id: '{{ other_lights }}'
+    - if:
+      - condition: template
+        value_template: '{{ set_light_color_temp_kelvin is not none and ct_capable_lights | count > 0 }}'
+      then:
+      - service: light.turn_on
+        data:
+          entity_id: '{{ ct_capable_lights }}'
+          color_temp_kelvin: '{{ set_light_color_temp_kelvin | int }}'
+    - delay:
+        milliseconds: !input delay_miliseconds
+  - conditions:
+    - condition: trigger
+      id: turn_off
+    sequence:
+    - service: light.turn_off
+      data:
+        entity_id: '{{ other_lights }}'
+    - delay:
+        milliseconds: !input delay_miliseconds
+  - conditions:
+    - condition: trigger
+      id: set_speed
+    sequence:
+    - variables:
+        set_fan_speed: '{{ trigger.to_state.attributes.percentage }}'
+    - condition: template
+      value_template: '{{ set_fan_speed is not none }}'
+    - service: fan.set_percentage
+      data:
+        entity_id: '{{ other_lights }}'
+        percentage: '{{ set_fan_speed }}'
+    - delay:
+        milliseconds: !input delay_miliseconds
+  - conditions:
+    - condition: trigger
+      id: set_brightness
+    sequence:
+    - variables:
+        set_light_brightness: '{{ trigger.to_state.attributes.brightness }}'
+    - condition: template
+      value_template: '{{ set_light_brightness is not none }}'
+    - service: light.turn_on
+      data:
+        entity_id: '{{ other_lights }}'
+        brightness: '{{ set_light_brightness | int }}'
+    - delay:
+        milliseconds: !input delay_miliseconds
+  - conditions:
+    - condition: trigger
+      id: set_color_temp
+    sequence:
+    - variables:
+        set_light_color_temp_kelvin: '{{ trigger.to_state.attributes.color_temp_kelvin }}'
+    - condition: template
+      value_template: '{{ set_light_color_temp_kelvin is not none and ct_capable_lights | count > 0 }}'
+    - service: light.turn_on
+      data:
+        entity_id: '{{ ct_capable_lights }}'
+        color_temp_kelvin: '{{ set_light_color_temp_kelvin | int }}'
+    - delay:
+        milliseconds: !input delay_miliseconds
